@@ -1,0 +1,4 @@
+*.las linguist-detectable=false
+*.LAS linguist-detectable=false
+*.las linguist-vendored
+*.LAS linguist-vendored
