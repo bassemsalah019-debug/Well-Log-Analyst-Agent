@@ -1,0 +1,34 @@
+# Streamlit theme for app.py. Colors are the Lovable light tokens (src/styles.css :root),
+# converted once from oklch to hex. The dark tokens (.dark) live in .streamlit/style.css,
+# because the light/dark switch happens in the page, like Lovable's AppearanceToggle.
+
+[theme]
+base = "light"
+primaryColor = "#016a5d"             # --primary            oklch(0.47 0.085 180)
+backgroundColor = "#f8f7f4"          # --background         oklch(0.976 0.004 100)
+secondaryBackgroundColor = "#edf1ef" # --muted              oklch(0.955 0.005 170)
+textColor = "#192423"                # --foreground         oklch(0.25 0.016 190)
+borderColor = "#d5ddda"              # --border             oklch(0.89 0.009 170)
+linkColor = "#016a5d"                # --primary
+font = "IBM Plex Sans"
+headingFont = "Libre Baskerville"
+codeFont = "JetBrains Mono"
+baseRadius = "4px"                   # --radius-md
+showWidgetBorder = true
+
+[theme.sidebar]
+backgroundColor = "#14211f"          # --shell              oklch(0.235 0.019 185)
+secondaryBackgroundColor = "#14211f"
+textColor = "#ecf4f1"                # --shell-foreground   oklch(0.96 0.009 170)
+borderColor = "#929f9c"              # --shell-muted        oklch(0.69 0.015 180)
+
+[server]
+address = "localhost"                # the agent can spend API credits and write files: keep it on this machine
+
+[client]
+toolbarMode = "minimal"
+showSidebarNavigation = false
+showErrorDetails = "full"
+
+[browser]
+gatherUsageStats = false
