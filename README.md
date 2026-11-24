@@ -17,27 +17,25 @@ An agent that evaluates the Hugin Formation reservoir in Volve wells from raw lo
 ```mermaid
 flowchart TB
     subgraph Interface
-        chat["phase1_training/chat.py<br/>terminal chat"]
+        chat["chat.py<br/>terminal chat"]
         app["app.py<br/>Streamlit web app"]
     end
     subgraph Agent
-        agent["phase1_training/agent.py"]
-        prompts["phase1_training/prompts.py"]
-        models["models.py<br/>model setup"]
+        agent["agent.py"]
+        prompts["prompts.py"]
     end
     subgraph Tools
-        tools["phase1_training/tools.py"]
+        tools["tools.py"]
     end
     subgraph Domain
-        config["phase1_training/config.py"]
-        memory["phase1_training/memory.py"]
-        las_io["phase1_training/las_io.py"]
-        petrophysics["phase1_training/petrophysics.py"]
-        comparison["phase1_training/comparison.py"]
+        config["config.py"]
+        memory["memory.py"]
+        las_io["las_io.py"]
+        petrophysics["petrophysics.py"]
+        comparison["comparison.py"]
     end
     Interface --> Agent
     Agent --> Tools
-    Agent --> models
     Tools --> Domain
 ```
 
