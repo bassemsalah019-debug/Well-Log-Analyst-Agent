@@ -17,32 +17,34 @@ An agent that evaluates the Hugin Formation reservoir in Volve wells from raw lo
 ```mermaid
 flowchart TB
     subgraph Interface
-        chat["chat.py<br/>terminal chat"]
+        chat["phase1_training/chat.py<br/>terminal chat"]
         app["app.py<br/>Streamlit web app"]
     end
     subgraph Agent
-        agent["agent.py"]
-        prompts["prompts.py"]
+        agent["phase1_training/agent.py"]
+        prompts["phase1_training/prompts.py"]
+        models["models.py<br/>model setup"]
     end
     subgraph Tools
-        tools["tools.py"]
+        tools["phase1_training/tools.py"]
     end
     subgraph Domain
-        config["config.py"]
-        memory["memory.py"]
-        las_io["las_io.py"]
-        petrophysics["petrophysics.py"]
-        comparison["comparison.py"]
+        config["phase1_training/config.py"]
+        memory["phase1_training/memory.py"]
+        las_io["phase1_training/las_io.py"]
+        petrophysics["phase1_training/petrophysics.py"]
+        comparison["phase1_training/comparison.py"]
     end
     Interface --> Agent
     Agent --> Tools
+    Agent --> models
     Tools --> Domain
 ```
 
-- **Domain** reads the LAS files (`las_io.py`), reads the parameters from `memories/AGENTS.md` (`memory.py`), applies the equations (`petrophysics.py`) and compares the results with Equinor's curves (`comparison.py`). Paths and curve names are in `config.py`.
-- **Tools** (`tools.py`) wrap the domain code for the model: `list_wells`, `describe_well`, `analyze_well`, `compare_with_equinor`. Every number the agent reports comes from these tools.
-- **Agent** (`agent.py`, `prompts.py`) is a deep agent with a subagent for field reviews. It asks for approval before it writes a report or changes its memory.
-- **Interface**: `chat.py` runs the chat in the terminal. `app.py` is a Streamlit app with a field overview, well pages, the agent with a report approval panel, saved reports and the curve dictionary.
+- **Domain** reads the LAS files (`phase1_training/las_io.py`), reads the parameters from `phase1_training/memories/AGENTS.md` (`phase1_training/memory.py`), applies the equations (`phase1_training/petrophysics.py`) and compares the results with Equinor's curves (`phase1_training/comparison.py`). Paths and curve names are in `phase1_training/config.py`.
+- **Tools** (`phase1_training/tools.py`) wrap the domain code for the model: `list_wells`, `describe_well`, `analyze_well`, `compare_with_equinor`. The agent is instructed to take every number it reports from these tools.
+- **Agent** (`phase1_training/agent.py`, `phase1_training/prompts.py`) is a deep agent with a subagent for field reviews. It asks for approval before it writes a report or changes its memory. The models are set up in `models.py`.
+- **Interface**: `phase1_training/chat.py` runs the chat in the terminal. `app.py` is a Streamlit app with a field overview, well pages, the agent with a report approval panel, saved reports and the curve dictionary.
 
 ## Method
 
@@ -77,9 +79,11 @@ Net sand:
 net sand = PHIF > 0.10 and VSH < 0.50
 ```
 
-All parameters come from Equinor's PETROPHYSICAL_REPORT files and are stored in `memories/AGENTS.md`. The agent reads them from there; it does not tune them.
+All parameters come from Equinor's PETROPHYSICAL_REPORT files and are stored in `phase1_training/memories/AGENTS.md`. The agent reads them from there; it does not tune them.
 
 ## Results
+
+*The tables and test results below are the project's own reported results, kept as the author recorded them; they were not independently rerun or verified for this documentation update.*
 
 ### A1: net sand averages, ours / Equinor report
 
@@ -118,7 +122,7 @@ In the three wells that miss (F-1 B, F-1 C, F-11 A), the gap comes almost entire
 ### Tests
 
 - Equation tests: 7 of 7 pass (`phase1_training/test_petrophysics.py`).
-- Behaviour tests: 9 of 9 pass (`phase1_training/eval_agent.py --behavior`, run on 2026-11-02). They cover: checking the curves first, using the tool numbers, explaining the Equinor comparison without inventing causes, a well with no Hugin Formation, an unknown well, refusing out-of-scope questions, approval before saving a report, delegating a field review to the subagent, and the subagent table matching the tools.
+- Behaviour tests: 9 of 9 pass (`phase1_training/eval_agent.py --behavior`, run on 2026-11-02). These tests call the live model; the equation tests do not. They cover: checking the curves first, using the tool numbers, explaining the Equinor comparison without inventing causes, a well with no Hugin Formation, an unknown well, refusing out-of-scope questions, approval before saving a report, delegating a field review to the subagent, and the subagent table matching the tools.
 
 ## Limitations
 
@@ -129,15 +133,38 @@ In the three wells that miss (F-1 B, F-1 C, F-11 A), the gap comes almost entire
 - SW assumes Hugin formation water.
 - The neutron correction does not reproduce Equinor's PHIF exactly where A = 0.4.
 
+## Model and API quota
+
+The agent and its subagent use Gemini through `models.py` (`gemini-flash-lite-latest`), with the key in `GOOGLE_API_KEY`. The Gemini API limits usage per Google Cloud project and per model, in three dimensions: requests per minute, input tokens per minute, and requests per day. The daily quota resets at midnight Pacific time. The exact limits and the project's current usage are shown in Google AI Studio.
+
+What uses the model in this project, and what does not:
+
+- The field overview and the well pages in the web app compute their numbers with the local code only, cached per `AGENTS.md` version (`st.cache_data`). Opening and browsing them makes no model calls.
+- The agent chat does. One answer is several model calls, not one: the model calls the well tools in a loop, and each call sends the conversation again. For illustration, a well analysis typically takes a few calls (describe, analyze, then the answer) and a report more; the actual count depends on how the model sequences and reuses tool calls.
+- A field review is the heaviest request: the well-analyst subagent runs its own loop and calls the tools for each well in turn, roughly two tool rounds per well.
+- The behaviour tests call the live model.
+- If the app is deployed, every visitor uses the same `GOOGLE_API_KEY`, so all its traffic counts against the same project quota.
+
+These are illustrative estimates from reading the code, not measurements; the project's real usage is in Google AI Studio.
+
 ## Quick start
 
 1. Install [uv](https://docs.astral.sh/uv/), then:
 
    ```bash
-   uv sync
+   uv sync --extra google
    ```
 
-2. Copy `.env.example` to `.env` and add your key. Never commit `.env`.
+   The `google` extra installs `langchain-google-genai`, which the Gemini models in `models.py` need.
+
+2. Create a `.env` file with your Gemini key (from [Google AI Studio](https://aistudio.google.com/api-keys)):
+
+   ```bash
+   GOOGLE_API_KEY=your-google-api-key
+   ```
+
+   Never commit `.env`. `.env.example` is a leftover course template that lists other providers; the app only needs `GOOGLE_API_KEY`.
+
 3. Equation tests:
 
    ```bash
@@ -170,9 +197,9 @@ The web app loads its two background images and its favicon from `assets/` insid
 
 ## Data
 
-Volve Data Village, Equinor ASA, released 2018: [LINK PLACEHOLDER, to be filled by the author].
+Volve Data Village, Equinor ASA and the former Volve license partners (ExxonMobil Exploration & Production Norway AS and Bayerngas Norge AS), released 2018: <https://www.equinor.com/energy/volve-data-sharing>
 
-Licence: [PLACEHOLDER, to be filled by the author].
+Licence: [Equinor Open Data Licence](https://www.equinor.com/content/dam/statoil/documents/what-we-do/Equinor-HRS-Terms-and-conditions-for-licence-to-data-Volve.pdf). The data may be used and shared for non-commercial and commercial purposes, it may not be sold, and Equinor and the former Volve license partners must be credited with a link to the licence terms.
 
 The `phase1_training/wells/` folder contains LAS files only (plus the small ASC and Excel files that come with them). The Equinor report PDFs are excluded.
 
@@ -183,4 +210,4 @@ The `phase1_training/wells/` folder contains LAS files only (plus the small ASC 
 
 ## License
 
-License: to be decided by the author.
+The code license is the author's choice (not decided yet). Independently of that choice, the Volve data and the results derived from it stay under the Equinor Open Data Licence, which requires the credit in the Data section and forbids selling the data.
